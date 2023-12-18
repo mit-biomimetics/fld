@@ -68,6 +68,18 @@ python scripts/play.py
 - Other runs/model iteration can be selected by setting `load_run` and `checkpoint` in the train config.
 - Use `u` and `j` to command the forward velocity.
 
+## Citation
+```
+@inproceedings{li2023learning,
+  title={Learning agile skills via adversarial imitation of rough partial demonstrations},
+  author={Li, Chenhao and Vlastelica, Marin and Blaes, Sebastian and Frey, Jonas and Grimminger, Felix and Martius, Georg},
+  booktitle={Conference on Robot Learning},
+  pages={342--352},
+  year={2023},
+  organization={PMLR}
+}
+```
+
 ## References
 
 The code is built upon the open-sourced [Isaac Gym Environments for Legged Robots](https://github.com/leggedrobotics/legged_gym) and the [PPO implementation](https://github.com/leggedrobotics/rsl_rl). We refer to the original repositories for more details.

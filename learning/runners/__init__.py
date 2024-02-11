@@ -3,6 +3,6 @@
 
 """Implementation of runners for environment-agent interaction."""
 
-from .wasabi_on_policy_runner import WASABIOnPolicyRunner
+from .gld_on_policy_runner import FLDOnPolicyRunner
 
-__all__ = ["WASABIOnPolicyRunner"]
+__all__ = ["FLDOnPolicyRunner"]

@@ -3,6 +3,6 @@
 
 """Implementation of different RL agents."""
 
-from .wasabi import WASABI
+from .ppo import PPO
 
-__all__ = ["WASABI"]
+__all__ = ["PPO"]

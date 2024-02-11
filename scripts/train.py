@@ -1,9 +1,9 @@
 """
 Main script for launching a training session.
 """
-# solo-gym
-from solo_gym.envs import task_registry
-from solo_gym.utils import get_args
+# humanoid-gym
+from humanoid_gym.envs import task_registry
+from humanoid_gym.utils import get_args
 
 
 def train(args):

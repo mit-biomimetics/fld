@@ -99,6 +99,13 @@ python scripts/play.py
 - The target motions are randomly selected from the dataset from the path specified by `datasets_root`. These motions are first encoded to the latent space and then sent to the policy for execution.
 - The fallback mechanism is enabled by default with a theshold of 1.0 on `dynamics_error`.
 
+## Troubleshooting
+```
+RuntimeError: nvrtc: error: invalid value for --gpu-architecture (-arch)
+```
+- This error occurs when the CUDA version is not compatible with the installed PyTorch version. A quick fix is to comment out decorator `@torch.jit.script` in `isaacgym/python/isaacgym/torch_utils.py`.
+
+
 ## Known Issues
 The `ALPGMMSampler` utilizes [faiss](https://github.com/facebookresearch/faiss) for efficient similarity search and clustering of dense vectors in the latent parameterization space. The installation of `faiss` requires a compatible CUDA version. The current implementation is tested with `faiss-cpu` and `faiss-gpu` with `cuda-10.2`.
 

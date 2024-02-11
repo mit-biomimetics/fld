@@ -1,4 +1,4 @@
-from solo_gym import LEGGED_GYM_ROOT_DIR
+from humanoid_gym import LEGGED_GYM_ROOT_DIR
 from isaacgym.torch_utils import (
     quat_mul,
     quat_conjugate,
@@ -141,6 +141,10 @@ class MotionLoader:
     def get_frames(self, num_frames):
         ids = torch.randint(0, self.num_preload_transitions, (num_frames,), device=self.device)
         return self.preloaded_states[ids, 0]
+    
+    def get_transitions(self, num_transitions):
+        ids = torch.randint(0, self.num_preload_transitions, (num_transitions,), device=self.device)
+        return self.preloaded_states[ids, :]
     
     def slerp(self, value_low, value_high, blend):
         return (1.0 - blend) * value_low + blend * value_high

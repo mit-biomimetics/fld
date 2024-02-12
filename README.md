@@ -39,7 +39,7 @@ This repository provides the [Fourier Latent Dynamics (FLD)](https://arxiv.org/a
 4. Install `humanoid_gym`
 
         git clone https://github.com/mit-biomimetics/fld.git
-        cd humanoid_gym
+        cd fld
         pip install -e .
 
 ## Configuration

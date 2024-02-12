@@ -91,7 +91,7 @@ python scripts/train.py --task mit_humanoid
 ### Policy Playing
 
 ```
-python scripts/play.py --load_run "logs/<experiment_name>/<date_time>_<run_name>"
+python scripts/play.py --load_run "<date_time>_<run_name>"
 ```
 
 - By default the loaded policy is the last model of the last run of the experiment folder.

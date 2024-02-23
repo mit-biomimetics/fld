@@ -112,13 +112,11 @@ The `ALPGMMSampler` utilizes [faiss](https://github.com/facebookresearch/faiss) 
 
 ## Citation
 ```
-@inproceedings{li2024fourier,
-  title={Fld: fourier latent dynamics for structured motion representation and learning},
+@article{li2024fld,
+  title={FLD: Fourier Latent Dynamics for Structured Motion Representation and Learning},
   author={Li, Chenhao and Stanger-Jones, Elijah and Heim, Steve and Kim, Sangbae},
-  booktitle={International Conference on Learning Representations},
-  pages={342--352},
-  year={2024},
-  organization={PMLR}
+  journal={arXiv preprint arXiv:2402.13820},
+  year={2024}
 }
 ```
 

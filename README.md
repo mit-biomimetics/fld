@@ -1,10 +1,10 @@
 # FLD with MIT Humanoid
 
-This repository provides the [Fourier Latent Dynamics (FLD)](https://arxiv.org/abs/2206.11693) algorithm that represents high-dimension, long-horizon, highly nonlinear, period or quasi-period data in a continuously parameterized space. This work demonstrates its representation and generation capability with a robotic motion tracking task on [MIT Humanoid](https://spectrum.ieee.org/mit-dynamic-acrobatic-humanoid-robot) using [NVIDIA Isaac Gym](https://developer.nvidia.com/isaac-gym).
+This repository provides the [Fourier Latent Dynamics (FLD)](https://arxiv.org/abs/2402.13820) algorithm that represents high-dimension, long-horizon, highly nonlinear, period or quasi-period data in a continuously parameterized space. This work demonstrates its representation and generation capability with a robotic motion tracking task on [MIT Humanoid](https://spectrum.ieee.org/mit-dynamic-acrobatic-humanoid-robot) using [NVIDIA Isaac Gym](https://developer.nvidia.com/isaac-gym).
 
 ![fld](fld.png)
 
-**Paper**: [FLD: Fourier Latent Dynamics for Structured Motion Representation and Learning](https://arxiv.org/abs/2206.11693)  
+**Paper**: [FLD: Fourier Latent Dynamics for Structured Motion Representation and Learning](https://arxiv.org/abs/2402.13820)  
 **Project website**: https://sites.google.com/view/iclr2024-fld/home
 
 **Maintainer**: [Chenhao Li](https://breadli428.github.io/)  

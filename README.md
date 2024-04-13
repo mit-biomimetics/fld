@@ -70,6 +70,12 @@ python scripts/fld/evaluate.py
 - A `gmm.pt` file is saved in the same folder, containing the Gaussian Mixture Model (GMM) of the latent parameters. This file is used to define the input data distribution for policy training with the offline gmm task sampler.
 - A set of latent parameters is sampled and reconstructed to the original motion space. The decoded motion is saved in `resources/robots/mit_humanoid/datasets/decoded/motion_data.pt`. Figure 1 shows the latent sample and the reconstructed motion trajectory. Figure 2 shows the sampled latent parameters. Figure 3 shows the latent manifold of the sampled trajectory, along with the original ones. Figure 4 shows the GMM of the latent parameters.
 
+### Dataset Replay
+```
+python scripts/fld/replay_dataset.py
+```
+- Directly replay the dataset files in isaac gym, which allows users to observe the difference between the dataset and fld output intuitively.
+
 ### Motion Visualization
 
 ```

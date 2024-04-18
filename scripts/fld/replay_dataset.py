@@ -51,11 +51,12 @@ def replay(args: argparse.Namespace):
     env_cfg.commands.ranges.ang_vel_yaw = [0.0, 0.0]
     env_cfg.domain_rand.added_mass_range = [0.0, 0.0]
     
-    env_cfg.fld.load_root = None  
-
     # prepare environment
     env, _ = task_registry.make_env(name=args.task, args=args, env_cfg=env_cfg)
     obs = env.get_observations()
+
+    train_cfg.runner.resume = False
+    ppo_runner, train_cfg = task_registry.make_alg_runner(env=env, name=args.task, args=args, train_cfg=train_cfg)
 
     state_idx_dict = {
         "base_pos": [0, 1, 2],
@@ -86,6 +87,7 @@ def replay(args: argparse.Namespace):
 
     camera_rot = 0
     camera_rot_per_sec = np.pi / 6
+    actions = torch.zeros((env_cfg.env.num_envs, env.num_actions), device=env.sim_device)
     
     for dataset_idx in range(aggregated_dataset_collection.shape[0]):
         for traj_idx in range(aggregated_dataset_collection.shape[1]):
@@ -93,8 +95,9 @@ def replay(args: argparse.Namespace):
 
                 # print(f"Playing dataset {motion_name_set[dataset_idx]}, trajectory {traj_idx}.")
 
-                env.render()
-                env.gym.simulate(env.sim)
+                # env.render()
+                # env.gym.simulate(env.sim)
+                env.step(actions.detach())
 
                 root_pos = aggregated_dataset_collection[dataset_idx, traj_idx, step_idx, 0:3].unsqueeze(0)
                 root_ori = aggregated_dataset_collection[dataset_idx, traj_idx, step_idx, 3:7].unsqueeze(0)

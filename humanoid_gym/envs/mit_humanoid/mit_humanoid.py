@@ -30,14 +30,13 @@ class MITHumanoid(LeggedRobot):
 
         self.fld = FLD(self.fld_observation_dim, self.fld_observation_horizon, self.fld_latent_channel, self.device, encoder_shape=self.cfg.fld.encoder_shape, decoder_shape=self.cfg.fld.decoder_shape).eval()
         fld_load_root = self.cfg.fld.load_root
-        if fld_load_root is not None:
-            fld_load_model = self.cfg.fld.load_model
-            loaded_dict = torch.load(fld_load_root + "/" + fld_load_model)
-            self.fld.load_state_dict(loaded_dict["fld_state_dict"])
-            self.fld.eval()
-            statistics_dict = torch.load(fld_load_root + "/statistics.pt")
-            self.state_transitions_mean, self.state_transitions_std = statistics_dict["state_transitions_mean"], statistics_dict["state_transitions_std"]
-            self.latent_param_max, self.latent_param_min, self.latent_param_mean, self.latent_param_std = statistics_dict["latent_param_max"], statistics_dict["latent_param_min"], statistics_dict["latent_param_mean"], statistics_dict["latent_param_std"]
+        fld_load_model = self.cfg.fld.load_model
+        loaded_dict = torch.load(fld_load_root + "/" + fld_load_model, map_location=self.sim_device)
+        self.fld.load_state_dict(loaded_dict["fld_state_dict"])
+        self.fld.eval()
+        statistics_dict = torch.load(fld_load_root + "/statistics.pt", map_location=self.sim_device)
+        self.state_transitions_mean, self.state_transitions_std = statistics_dict["state_transitions_mean"], statistics_dict["state_transitions_std"]
+        self.latent_param_max, self.latent_param_min, self.latent_param_mean, self.latent_param_std = statistics_dict["latent_param_max"], statistics_dict["latent_param_min"], statistics_dict["latent_param_mean"], statistics_dict["latent_param_std"]
         self.decoded_obs = torch.zeros(self.num_envs, self.fld_observation_dim, dtype=torch.float, device=self.device, requires_grad=False)
         self.decoded_obs_state_idx_dict = {}
         current_length = 0

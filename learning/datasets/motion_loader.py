@@ -163,50 +163,58 @@ class MotionLoader:
             states = self.preloaded_states[ids, :, self.observation_start_dim:]
             yield states
 
-    def get_base_pos(self, frames):
-        if "base_pos" in self.state_idx_dict:
-            return frames[:, self.state_idx_dict["base_pos"][0]:self.state_idx_dict["base_pos"][1]]
+    @staticmethod
+    def get_base_pos(state_idx_dict, frames):
+        if "base_pos" in state_idx_dict:
+            return frames[:, state_idx_dict["base_pos"][0]:state_idx_dict["base_pos"][1]]
         else:
             raise Exception("[MotionLoader] base_pos not specified in the state_idx_dict")
 
-    def get_base_quat(self, frames):
-        if "base_quat" in self.state_idx_dict:
-            return frames[:, self.state_idx_dict["base_quat"][0]:self.state_idx_dict["base_quat"][1]]
+    @staticmethod
+    def get_base_quat(state_idx_dict, frames):
+        if "base_quat" in state_idx_dict:
+            return frames[:, state_idx_dict["base_quat"][0]:state_idx_dict["base_quat"][1]]
         else:
             raise Exception("[MotionLoader] base_quat not specified in the state_idx_dict")
 
-    def get_base_lin_vel(self, frames):
-        if "base_lin_vel" in self.state_idx_dict:
-            return frames[:, self.state_idx_dict["base_lin_vel"][0]:self.state_idx_dict["base_lin_vel"][1]]
+    @staticmethod
+    def get_base_lin_vel(state_idx_dict, frames):
+        if "base_lin_vel" in state_idx_dict:
+            return frames[:, state_idx_dict["base_lin_vel"][0]:state_idx_dict["base_lin_vel"][1]]
         else:
             raise Exception("[MotionLoader] base_lin_vel not specified in the state_idx_dict")
 
-    def get_base_ang_vel(self, frames):
-        if "base_ang_vel" in self.state_idx_dict:
-            return frames[:, self.state_idx_dict["base_ang_vel"][0]:self.state_idx_dict["base_ang_vel"][1]]
+    @staticmethod
+    def get_base_ang_vel(state_idx_dict, frames):
+        if "base_ang_vel" in state_idx_dict:
+            return frames[:, state_idx_dict["base_ang_vel"][0]:state_idx_dict["base_ang_vel"][1]]
         else:
             raise Exception("[MotionLoader] base_ang_vel not specified in the state_idx_dict")
 
-    def get_projected_gravity(self, frames):
-        if "projected_gravity" in self.state_idx_dict:
-            return frames[:, self.state_idx_dict["projected_gravity"][0]:self.state_idx_dict["projected_gravity"][1]]
+    @staticmethod
+    def get_projected_gravity(state_idx_dict, frames):
+        if "projected_gravity" in state_idx_dict:
+            return frames[:, state_idx_dict["projected_gravity"][0]:state_idx_dict["projected_gravity"][1]]
         else:
             raise Exception("[MotionLoader] projected_gravity not specified in the state_idx_dict")
 
-    def get_dof_pos(self, frames):
-        if "dof_pos" in self.state_idx_dict:
-            return frames[:, self.state_idx_dict["dof_pos"][0]:self.state_idx_dict["dof_pos"][1]]
+    @staticmethod
+    def get_dof_pos(state_idx_dict, frames):
+        if "dof_pos" in state_idx_dict:
+            return frames[:, state_idx_dict["dof_pos"][0]:state_idx_dict["dof_pos"][1]]
         else:
             raise Exception("[MotionLoader] dof_pos not specified in the state_idx_dict")
 
-    def get_dof_vel(self, frames):
-        if "dof_vel" in self.state_idx_dict:
-            return frames[:, self.state_idx_dict["dof_vel"][0]:self.state_idx_dict["dof_vel"][1]]
+    @staticmethod
+    def get_dof_vel(state_idx_dict, frames):
+        if "dof_vel" in state_idx_dict:
+            return frames[:, state_idx_dict["dof_vel"][0]:state_idx_dict["dof_vel"][1]]
         else:
             raise Exception("[MotionLoader] dof_vel not specified in the state_idx_dict")
 
-    def get_feet_pos(self, frames):
-        if "feet_pos" in self.state_idx_dict:
-            return frames[:, self.state_idx_dict["feet_pos"][0]:self.state_idx_dict["feet_pos"][1]]
+    @staticmethod
+    def get_feet_pos(state_idx_dict, frames):
+        if "feet_pos" in state_idx_dict:
+            return frames[:, state_idx_dict["feet_pos"][0]:state_idx_dict["feet_pos"][1]]
         else:
             raise Exception("[MotionLoader] feet_pos not specified in the state_idx_dict")

@@ -56,6 +56,8 @@ This repository provides the [Fourier Latent Dynamics (FLD)](https://arxiv.org/a
 python scripts/fld/experiment.py
 ```
 
+- `observation_horizon` denotes the window size of the input data. A good practice is to set it such that it contains at least one period of the motion.
+- `num_consecutives` denotes the number of future frames to predict while maintaining the quasi-constant latent parameterization. For motions with high aperiodicity, this value should be set small. It falls back to PAE when `num_consecutives` is set to zero.
 - The training process is visualized by inspecting the Tensorboard logs at `logs/<experiment_name>/fld/misc/`. The figures include the FLD loss, the reconstruction of sampled trajectories for each motion, the latent parameters in each latent channel along sampled trajectories for each motion with the formed latent manifold, and the latent parameter distribution.
 - The trained FLD model is saved in `logs/<experiment_name>/fld/misc/model_<iteration>.pt`, where `<experiment_name>` is defined in the experiment config.
 - A `statistics.pt` file is saved in the same folder, containing the mean and standard deviation of the input data and the statistics of the latent parameterization space. This file is used to normalize the input data and to define plotting ranges during policy training.
@@ -76,6 +78,8 @@ python scripts/fld/evaluate.py
 python scripts/fld/preview.py
 ```
 - The decoded motion reconstructed from the sampled latent parameters is visualized in the Isaac Gym environment. Note that the motion contains only kinematic and proprioceptive information. The global position and orientation are approximated by integrating the velocity information with finite difference.
+- To visualize the original motions in the training dataset, set `motion_file` to the corresponding motion file.
+- Alternatively, the latent parameters can be interactively modified by setting `PLAY_LOADED_DATA` to `False`. The modified latent parameters are then decoded to the original motion space and visualized.
 
 ### Policy Training
 

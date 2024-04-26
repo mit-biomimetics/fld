@@ -11,6 +11,29 @@ import matplotlib.pyplot as plt
 from torch.utils.tensorboard import SummaryWriter
 
 class FLDTraining:
+    """
+    Class for training the FLD model.
+
+    Args:
+        log_dir (str): The directory to save the training logs.
+        latent_dim (int): The dimension of the latent space.
+        observation_horizon (int): The length of the input observation window.
+        num_consecutives (int): The number of consecutive future steps to predict while maintaining the quasi-constant latent parameterization.
+        state_idx_dict (dict): A dictionary mapping state names to their corresponding indices.
+        state_transitions_data (torch.Tensor): The state transitions data.
+        state_transitions_mean (torch.Tensor): The mean of the state transitions data.
+        state_transitions_std (torch.Tensor): The standard deviation of the state transitions data.
+        fld_encoder_shape (list, optional): The shape of the FLD encoder. Defaults to None.
+        fld_decoder_shape (list, optional): The shape of the FLD decoder. Defaults to None.
+        fld_learning_rate (float, optional): The learning rate for FLD optimization. Defaults to 0.0001.
+        fld_weight_decay (float, optional): The weight decay for FLD optimization. Defaults to 0.0005.
+        fld_num_mini_batches (int, optional): The number of mini-batches for FLD training. Defaults to 80.
+        device (str, optional): The device to use for training. Defaults to "cuda".
+        loss_function (str, optional): The loss function to use. Can be "mse" or "geometric". Defaults to "mse".
+        noise_level (float, optional): The level of noise to add to the input data. Defaults to 0.0.
+        loss_horizon_discount (float, optional): The discount factor for the loss horizon. Defaults to 1.0.
+    """
+
     def __init__(self,
                  log_dir,
                  latent_dim,
@@ -88,12 +111,28 @@ class FLDTraining:
 
 
     def compute_loss(self, input, target):
+        """
+        Compute the loss between the input and target tensors.
+
+        Args:
+            input (torch.Tensor): The input tensor.
+            target (torch.Tensor): The target tensor.
+
+        Returns:
+            torch.Tensor: The computed loss.
+        """
         input_original = input * self.state_transitions_std + self.state_transitions_mean
         target_original = target * self.state_transitions_std + self.state_transitions_mean
         return torch.mean(torch.sum(torch.square((input_original - target_original) * self.loss_scale), dim=-1))
 
         
     def train(self, max_iterations=1000):
+        """
+        Train the FLD model.
+
+        Args:
+            max_iterations (int, optional): The maximum number of training iterations. Defaults to 1000.
+        """
         print("[FLD] Training started.")
         tot_iter = self.current_learning_iteration + max_iterations
         mean_fld_loss = 0

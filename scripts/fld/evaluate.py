@@ -181,11 +181,13 @@ class FLDEvaluate:
         decoded_traj_buf = torch.zeros(decoded_traj.size(0), decoded_traj.size(1), 52, device=device, dtype=torch.float, requires_grad=False)
         decoded_base_ang_vel = decoded_traj[:, :, torch.tensor(state_idx_dict["base_ang_vel"]) - self.observation_start_dim]
         init_base_quat = torch.tensor([0.0, 0.0, 0.0, 1.0], device=device, dtype=torch.float, requires_grad=False).repeat(decoded_traj.size(0), 1)
+        # integrate base ang vel to get base quat
         decoded_base_quat = get_base_quat_from_base_ang_vel(decoded_base_ang_vel, self.dt, source_frame="local", init_base_quat=init_base_quat)
 
         init_base_pos = torch.tensor([0.0, 0.0, 0.66], device=device, dtype=torch.float, requires_grad=False)
         decoded_base_lin_vel = decoded_traj[:, :, torch.tensor(state_idx_dict["base_lin_vel"]) - self.observation_start_dim]
         decoded_base_lin_vel_global = quat_rotate(decoded_base_quat.flatten(0, 1), decoded_base_lin_vel.flatten(0, 1)).view(-1, decoded_traj.size(1), 3)
+        # integrate base lin vel to get base pos
         decoded_base_pos_change = torch.cumsum(decoded_base_lin_vel_global * self.dt, dim=1)
         decoded_base_pos = decoded_base_pos_change + init_base_pos
 

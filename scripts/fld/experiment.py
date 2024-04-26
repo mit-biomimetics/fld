@@ -5,7 +5,17 @@ import torch
 
 
 class FLDExperiment:
-    
+    """
+    Represents an experiment for FLD (Future Learning from Demonstrations).
+
+    Args:
+        state_idx_dict (dict): A dictionary mapping state names to their corresponding indices.
+        observation_horizon (int): The length of the input observation window.
+        num_consecutives (int): The number of consecutive future steps to predict while maintaining the quasi-constant latent parameterization.
+        device (str): The device to use for computation.
+
+    """
+
     def __init__(self, state_idx_dict, observation_horizon, num_consecutives, device):
         self.state_idx_dict = state_idx_dict
         self.observation_horizon = observation_horizon
@@ -20,6 +30,13 @@ class FLDExperiment:
         self.device = device
 
     def prepare_data(self):
+        """
+        Loads and prepares the motion data.
+
+        This method loads the motion data from the specified directory, normalizes it,
+        and calculates the mean and standard deviation of the state transitions data.
+
+        """
         datasets_root = os.path.join(LEGGED_GYM_ROOT_DIR + "/resources/robots/mit_humanoid/datasets/misc")
         motion_data = os.listdir(datasets_root)
         motion_name_set = [data.replace('motion_data_', '').replace('.pt', '') for data in motion_data if "combined" not in data and ".pt" in data]
@@ -32,14 +49,24 @@ class FLDExperiment:
             print(f"[Motion Loader] Loaded motion {motion_name} with {loaded_num_trajs} trajectories, {loaded_num_steps} steps with {loaded_obs_dim} dimensions.")
             motion_data_collection.append(motion_data.unsqueeze(0))
 
-        motion_data_collection = torch.cat(motion_data_collection, dim=0)
+        motion_data_collection = torch.cat(motion_data_collection, dim=0) # (num_motions, num_trajs, traj_len, obs_dim)
         self.state_transitions_mean = motion_data_collection.flatten(0, 2).mean(dim=0)
         self.state_transitions_std = motion_data_collection.flatten(0, 2).std(dim=0) + 1e-6
 
-        motion_data_collection = motion_data_collection.unfold(2, self.observation_horizon + self.num_consecutives - 1, 1).swapaxes(-2, -1)
+        # Unfold the data to prepare for training
+        # num_steps denotes the bootstrap window size containing the observation horizon and the number of consecutive steps to predict
+        motion_data_collection = motion_data_collection.unfold(2, self.observation_horizon + self.num_consecutives - 1, 1).swapaxes(-2, -1) # (num_motions, num_trajs, num_groups, num_steps, obs_dim)
         self.state_transitions_data = (motion_data_collection - self.state_transitions_mean) / self.state_transitions_std
 
     def train(self, log_dir, latent_dim):
+        """
+        Trains the FLD model.
+
+        Args:
+            log_dir (str): The directory to save the training logs.
+            latent_dim (int): The dimensionality of the latent space.
+
+        """
         fld_training = FLDTraining(
             log_dir,
             latent_dim,

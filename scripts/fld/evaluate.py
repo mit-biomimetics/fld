@@ -178,6 +178,8 @@ class FLDEvaluate:
         decoded_path = os.path.join(decoded_root, "motion_data.pt")
 
         # fill global pos and quat from integrated lin_vel and ang_vel
+        # this is a hacky way to approximate the base pos and quat, which are for visualization only
+        # depending on the step time self.dt, the integrated trajectory may be inaccurate
         decoded_traj_buf = torch.zeros(decoded_traj.size(0), decoded_traj.size(1), 52, device=device, dtype=torch.float, requires_grad=False)
         decoded_base_ang_vel = decoded_traj[:, :, torch.tensor(state_idx_dict["base_ang_vel"]) - self.observation_start_dim]
         init_base_quat = torch.tensor([0.0, 0.0, 0.0, 1.0], device=device, dtype=torch.float, requires_grad=False).repeat(decoded_traj.size(0), 1)

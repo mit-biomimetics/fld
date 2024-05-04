@@ -60,6 +60,7 @@ python scripts/fld/experiment.py
 - `num_consecutives` denotes the number of future steps to predict while maintaining the quasi-constant latent parameterization. For motions with high aperiodicity, this value should be set small. It falls back to PAE when `num_consecutives` is set to zero.
 - The training process is visualized by inspecting the Tensorboard logs at `logs/<experiment_name>/fld/misc/`. The figures include the FLD loss, the reconstruction of sampled trajectories for each motion, the latent parameters in each latent channel along sampled trajectories for each motion with the formed latent manifold, and the latent parameter distribution.
 - The trained FLD model is saved in `logs/<experiment_name>/fld/misc/model_<iteration>.pt`, where `<experiment_name>` is defined in the experiment config.
+- The training process is logged in the same folder. Run `tensorboard --logdir logs/<experiment_name>/fld/misc/ --samples_per_plugin images=100` to visualize the training loss and plots.
 - A `statistics.pt` file is saved in the same folder, containing the mean and standard deviation of the input data and the statistics of the latent parameterization space. This file is used to normalize the input data and to define plotting ranges during policy training.
 
 ### FLD Evaluation

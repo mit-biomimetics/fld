@@ -6,7 +6,7 @@ from setuptools import setup, find_packages
 INSTALL_REQUIRES = [
     "isaacgym",
     "matplotlib",
-    "tensorboard",
+    "tensorboard<=2.11.0",
     "torch>=1.4.0",
     "torchvision>=0.5.0",
     "onnx",

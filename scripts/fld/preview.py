@@ -64,7 +64,7 @@ def preview(args: argparse.Namespace):
     env._compute_torques = type(env._compute_torques)(_zero_torques, env)
 
     if PLAY_LOADED_DATA:
-        motion_file = LEGGED_GYM_ROOT_DIR + "/resources/robots/mit_humanoid/datasets/decoded/motion_data.pt"
+        motion_file = LEGGED_GYM_ROOT_DIR + "/resources/robots/mit_humanoid/datasets/misc/motion_data_run.pt"
         motion_loader = MotionLoader(
         device=env.device,
         motion_file=motion_file,

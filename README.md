@@ -71,15 +71,14 @@ python scripts/fld/evaluate.py
 - A `latent_params.pt` file is saved in the same folder, containing the latent parameters of the input data. This file is used to define the input data for policy training with the offline task sampler.
 - A `gmm.pt` file is saved in the same folder, containing the Gaussian Mixture Model (GMM) of the latent parameters. This file is used to define the input data distribution for policy training with the offline gmm task sampler.
 - A set of latent parameters is sampled and reconstructed to the original motion space. The decoded motion is saved in `resources/robots/mit_humanoid/datasets/decoded/motion_data.pt`. Figure 1 shows the latent sample and the reconstructed motion trajectory. Figure 2 shows the sampled latent parameters. Figure 3 shows the latent manifold of the sampled trajectory, along with the original ones. Figure 4 shows the GMM of the latent parameters.
+- Note that the motion contains only kinematic and proprioceptive information. For visualization only, the global position and orientation of the robot base are approximated by integrating the velocity information with finite difference. Depending on the finite difference method and the intial states, the global position and orientation may be inaccurate and drift over time.
 
 ### Motion Visualization
 
 ```
 python scripts/fld/preview.py
 ```
-- The decoded motion reconstructed from the sampled latent parameters is visualized in the Isaac Gym environment. Note that the motion contains only kinematic and proprioceptive information. The global position and orientation are approximated by integrating the velocity information with finite difference.
-- The global position and orientation are obtained only for visualization. Depending on the finite difference method and the intial values, the global position and orientation may be inaccurate and drift over time.
-- To visualize the original motions in the training dataset, set `motion_file` to the corresponding motion file.
+- To visualize the original motions in the training dataset or the sampled and decoded motions in the Isaac Gym environment, set `motion_file` to the corresponding motion file.
 - Alternatively, the latent parameters can be interactively modified by setting `PLAY_LOADED_DATA` to `False`. The modified latent parameters are then decoded to the original motion space and visualized.
 
 ### Policy Training

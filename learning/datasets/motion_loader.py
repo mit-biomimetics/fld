@@ -11,9 +11,9 @@ import torch
 
 class MotionLoader:
 
-    def __init__(self, device, motion_file=None, corruption_level=0.0, reference_observation_horizon=2, test_mode=False, test_observation_dim=None):
+    def __init__(self, device, motion_file=None, corruption_level=0.0, reference_history_horizon=2, test_mode=False, test_observation_dim=None):
         self.device = device
-        self.reference_observation_horizon = reference_observation_horizon
+        self.reference_history_horizon = reference_history_horizon
         if motion_file is None:
             motion_file = LEGGED_GYM_ROOT_DIR + "/resources/robots/anymal_c/datasets/motion_data.pt"
         self.reference_state_idx_dict_file = os.path.join(os.path.dirname(motion_file), "reference_state_idx_dict.json")
@@ -44,16 +44,16 @@ class MotionLoader:
         # Preload transitions
         self.num_preload_transitions = 500000
         motion_clip_sample_ids = torch.randint(0, self.num_motion_clips, (self.num_preload_transitions,), device=self.device)
-        step_sample = torch.rand(self.num_preload_transitions, device=self.device) * (self.num_steps - self.reference_observation_horizon)
+        step_sample = torch.rand(self.num_preload_transitions, device=self.device) * (self.num_steps - self.reference_history_horizon)
         self.preloaded_states = torch.zeros(
             self.num_preload_transitions,
-            self.reference_observation_horizon,
+            self.reference_history_horizon,
             self.reference_full_dim,
             dtype=torch.float,
             device=self.device,
             requires_grad=False
         )
-        for i in range(self.reference_observation_horizon):
+        for i in range(self.reference_history_horizon):
             self.preloaded_states[:, i] = self._get_frame_at_step(motion_clip_sample_ids, step_sample + i)
         
         if test_mode:

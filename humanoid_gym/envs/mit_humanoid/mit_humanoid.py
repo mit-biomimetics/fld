@@ -19,16 +19,16 @@ class MITHumanoid(LeggedRobot):
     def __init__(self, cfg, sim_params, physics_engine, sim_device, headless):
         super().__init__(cfg, sim_params, physics_engine, sim_device, headless)
         self.fld_latent_channel = self.cfg.fld.latent_channel
-        self.fld_observation_horizon = self.cfg.fld.observation_horizon
+        self.fld_history_horizon = self.cfg.fld.history_horizon
         self.fld_state_idx_dict = self.cfg.fld.state_idx_dict
         self.fld_dim_of_interest = torch.cat([torch.tensor(ids, device=self.device, dtype=torch.long, requires_grad=False) for state, ids in self.fld_state_idx_dict.items() if ((state != "base_pos") and (state != "base_quat"))])
         self.fld_observation_dim = len(self.fld_dim_of_interest)
         self.fld_observation_buf = torch.zeros(
-            self.num_envs, self.fld_observation_horizon, self.fld_observation_dim, dtype=torch.float, device=self.device, requires_grad=False
+            self.num_envs, self.fld_history_horizon, self.fld_observation_dim, dtype=torch.float, device=self.device, requires_grad=False
         )
         self.fld_state = torch.zeros(self.num_envs, self.fld_observation_dim, dtype=torch.float, device=self.device, requires_grad=False)
 
-        self.fld = FLD(self.fld_observation_dim, self.fld_observation_horizon, self.fld_latent_channel, self.device, encoder_shape=self.cfg.fld.encoder_shape, decoder_shape=self.cfg.fld.decoder_shape).eval()
+        self.fld = FLD(self.fld_observation_dim, self.fld_history_horizon, self.fld_latent_channel, self.device, encoder_shape=self.cfg.fld.encoder_shape, decoder_shape=self.cfg.fld.decoder_shape).eval()
         fld_load_root = self.cfg.fld.load_root
         fld_load_model = self.cfg.fld.load_model
         loaded_dict = torch.load(fld_load_root + "/" + fld_load_model)

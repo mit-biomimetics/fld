@@ -17,8 +17,8 @@ class FLDTraining:
     Args:
         log_dir (str): The directory to save the training logs.
         latent_dim (int): The dimension of the latent space.
-        observation_horizon (int): The length of the input observation window.
-        num_consecutives (int): The number of consecutive future steps to predict while maintaining the quasi-constant latent parameterization.
+        history_horizon (int): The length of the input observation window.
+        forecast_horizon (int): The number of consecutive future steps to predict while maintaining the quasi-constant latent parameterization.
         state_idx_dict (dict): A dictionary mapping state names to their corresponding indices.
         state_transitions_data (torch.Tensor): The state transitions data.
         state_transitions_mean (torch.Tensor): The mean of the state transitions data.
@@ -37,8 +37,8 @@ class FLDTraining:
     def __init__(self,
                  log_dir,
                  latent_dim,
-                 observation_horizon,
-                 num_consecutives,
+                 history_horizon,
+                 forecast_horizon,
                  state_idx_dict,
                  state_transitions_data,
                  state_transitions_mean,
@@ -53,11 +53,13 @@ class FLDTraining:
                  noise_level=0.0,
                  loss_horizon_discount=1.0,
                  ) -> None:
+        # num_steps denotes the trajectory length induced by bootstrapping the window of history_horizon forward with forecast_horizon steps
+        # num_groups denotes the number of such num_steps
         self.num_motions, self.num_trajs, self.num_groups, self.num_steps, self.observation_dim = state_transitions_data.size()
         self.log_dir = log_dir
         self.latent_dim = latent_dim
-        self.observation_horizon = observation_horizon
-        self.num_consecutives = num_consecutives
+        self.history_horizon = history_horizon
+        self.forecast_horizon = forecast_horizon
         self.state_transitions_data = state_transitions_data
         self.state_transitions_mean = state_transitions_mean
         self.state_transitions_std = state_transitions_std
@@ -75,7 +77,7 @@ class FLDTraining:
                 self.loss_state_idx_dict[state] = list(range(current_length, current_length + len(ids)))
                 current_length = current_length + len(ids)
                 
-        self.loss_scale = torch.ones(1, self.observation_horizon, self.observation_dim, device=self.device, dtype=torch.float, requires_grad=False)
+        self.loss_scale = torch.ones(1, self.history_horizon, self.observation_dim, device=self.device, dtype=torch.float, requires_grad=False)
         if self.loss_function == "geometric":
             for state, ids in self.loss_state_idx_dict.items():
                 if "base_lin_vel" in state:
@@ -88,18 +90,19 @@ class FLDTraining:
                     self.loss_scale[..., ids] = 1.0
                 elif "dof_vel" in state:
                     self.loss_scale[..., ids] = 0.5
-        self.loss_scale *= torch.pow(self.loss_horizon_discount, torch.arange(self.observation_horizon, device=self.device, dtype=torch.float, requires_grad=False)).view(1, -1, 1)
+        self.loss_scale *= torch.pow(self.loss_horizon_discount, torch.arange(self.history_horizon, device=self.device, dtype=torch.float, requires_grad=False)).view(1, -1, 1)
 
-        self.fld = FLD(self.observation_dim, self.observation_horizon, self.latent_dim, self.device, encoder_shape=fld_encoder_shape, decoder_shape=fld_decoder_shape)
+        self.fld = FLD(self.observation_dim, self.history_horizon, self.latent_dim, self.device, encoder_shape=fld_encoder_shape, decoder_shape=fld_decoder_shape)
         self.fld_optimizer = optim.Adam(self.fld.parameters(), lr=fld_learning_rate, weight_decay=fld_weight_decay)
         
         self.replay_buffer_size = self.num_motions * self.num_trajs * self.num_groups
         self.state_transitions = ReplayBuffer(self.observation_dim, self.num_steps, self.replay_buffer_size, self.device)
         self.state_transitions.insert(self.state_transitions_data.flatten(0, 2))
         
-        self.distribution_frequency = DistributionBuffer(self.latent_dim, 20000, self.device)
-        self.distribution_amplitude = DistributionBuffer(self.latent_dim, 20000, self.device)
-        self.distribution_offset = DistributionBuffer(self.latent_dim, 20000, self.device)
+        distribution_buffer_size = 20000
+        self.distribution_frequency = DistributionBuffer(self.latent_dim, distribution_buffer_size, self.device)
+        self.distribution_amplitude = DistributionBuffer(self.latent_dim, distribution_buffer_size, self.device)
+        self.distribution_offset = DistributionBuffer(self.latent_dim, distribution_buffer_size, self.device)
 
         self.plotter = Plotter()
         self.fig0, self.ax0 = plt.subplots(1, 3)
@@ -142,15 +145,20 @@ class FLDTraining:
                 self.num_motions * self.num_trajs * self.num_groups // self.fld_num_mini_batches
             )
             for batch_state_transitions in state_transitions_data_generator:
-                batch = batch_state_transitions.unfold(1, self.observation_horizon, 1)
+                batch = batch_state_transitions.unfold(1, self.history_horizon, 1) # (mini_batch_size, forecast_horizon, obs_dim, history_horizon)
                 batch_noised = batch + torch.randn_like(batch, device=self.device) * self.noise_level
-                batch_input = batch_noised[:, 0, :, :]
-                pred_dynamics, latent, signal, params = self.fld.forward(batch_input, k=self.num_consecutives)
+                batch_input = batch_noised[:, 0, :, :]  # (mini_batch_size, obs_dim, history_horizon)
+                pred_dynamics, latent, signal, params = self.fld.forward(batch_input, k=self.forecast_horizon)
+                # pred_dynamics: (forecast_horizon, mini_batch_size, obs_dim, history_horizon)
+                # latent: (mini_batch_size, latent_dim, history_horizon)
+                # signal: (mini_batch_size, latent_dim, history_horizon)
+                # params: 4-tuple of (phase, frequency, amplitude, offset) each of shape (mini_batch_size, latent_dim)
                 phase, frequency, amplitude, offset = params
                 
                 # reconstruction loss
                 loss = 0
-                for i in range(self.num_consecutives):
+                for i in range(self.forecast_horizon):
+                    # compute loss for each step of forecast_horizon
                     reconstruction_loss = self.compute_loss(pred_dynamics[i, :, :, :].swapaxes(-2, -1), batch.swapaxes(-2, -1)[:, i])
                     loss += reconstruction_loss
                 mean_fld_loss += loss.item()
@@ -180,15 +188,15 @@ class FLDTraining:
                     eval_manifold_collection = []
 
                     for i in range(self.num_motions):
-                        eval_traj = self.state_transitions_data[i, 0, :, :self.observation_horizon, :].swapaxes(1, 2)
+                        eval_traj = self.state_transitions_data[i, 0, :, :self.history_horizon, :].swapaxes(1, 2)
                         pred_dynamics, latent, signal, params = self.fld(eval_traj)
                         pred = pred_dynamics[0]
-                        self.plotter.plot_curves(self.ax1[0], eval_traj[plot_traj_index], -1.0, 1.0, -5.0, 5.0, title="Motion Curves" + " " + str(self.fld.input_channel) + "x" + str(self.observation_horizon), show_axes=False)
-                        self.plotter.plot_curves(self.ax1[1], latent[plot_traj_index], -1.0, 1.0, -2.0, 2.0, title="Latent Convolutional Embedding" + " " + str(self.latent_dim) + "x" + str(self.observation_horizon), show_axes=False)
+                        self.plotter.plot_curves(self.ax1[0], eval_traj[plot_traj_index], -1.0, 1.0, -5.0, 5.0, title="Motion Curves" + " " + str(self.fld.input_channel) + "x" + str(self.history_horizon), show_axes=False)
+                        self.plotter.plot_curves(self.ax1[1], latent[plot_traj_index], -1.0, 1.0, -2.0, 2.0, title="Latent Convolutional Embedding" + " " + str(self.latent_dim) + "x" + str(self.history_horizon), show_axes=False)
                         self.plotter.plot_circles(self.ax1[2], params[0][plot_traj_index], params[2][plot_traj_index], title="Learned Phase Timing"  + " " + str(self.latent_dim) + "x" + str(2), show_axes=False)
-                        self.plotter.plot_curves(self.ax1[3], signal[plot_traj_index], -1.0, 1.0, -2.0, 2.0, title="Latent Parametrized Signal" + " " + str(self.latent_dim) + "x" + str(self.observation_horizon), show_axes=False)
-                        self.plotter.plot_curves(self.ax1[4], pred[plot_traj_index], -1.0, 1.0, -5.0, 5.0, title="Curve Reconstruction" + " " + str(self.fld.input_channel) + "x" + str(self.observation_horizon), show_axes=False)
-                        self.plotter.plot_curves(self.ax1[5], torch.vstack((eval_traj[plot_traj_index].flatten(0, 1), pred[plot_traj_index].flatten(0, 1))), -1.0, 1.0, -5.0, 5.0, title="Curve Reconstruction (Flattened)" + " " + str(1) + "x" + str(self.fld.input_channel*self.observation_horizon), show_axes=False)
+                        self.plotter.plot_curves(self.ax1[3], signal[plot_traj_index], -1.0, 1.0, -2.0, 2.0, title="Latent Parametrized Signal" + " " + str(self.latent_dim) + "x" + str(self.history_horizon), show_axes=False)
+                        self.plotter.plot_curves(self.ax1[4], pred[plot_traj_index], -1.0, 1.0, -5.0, 5.0, title="Curve Reconstruction" + " " + str(self.fld.input_channel) + "x" + str(self.history_horizon), show_axes=False)
+                        self.plotter.plot_curves(self.ax1[5], torch.vstack((eval_traj[plot_traj_index].flatten(0, 1), pred[plot_traj_index].flatten(0, 1))), -1.0, 1.0, -5.0, 5.0, title="Curve Reconstruction (Flattened)" + " " + str(1) + "x" + str(self.fld.input_channel*self.history_horizon), show_axes=False)
                         
                         self.writer.add_figure(f"fld/reconstruction/motion_{i}", self.fig1, it)
                         
@@ -232,7 +240,7 @@ class FLDTraining:
                 self.distribution_amplitude.get_distribution(),
                 self.distribution_offset.get_distribution(),
             ), dim=1
-        )
+        ) # (distribution_buffer_size, latent_dim * 3)
         torch.save(
             {
                 "state_transitions_mean": self.state_transitions_mean,
@@ -264,15 +272,16 @@ class FLDTraining:
 
     
     def fit_gmm(self, covariance_type="diag"):
+        # Fit GMM to the latent parameterization of all state transitions
         self.fig4, self.ax4 = plt.subplots(1, 3, subplot_kw=dict(projection='polar'))
         self.gmm = GaussianMixture(self.num_motions, self.latent_dim * 3, device=self.device, covariance_type=covariance_type)
-        all_state_transitions = self.state_transitions_data[:, :, :, :self.observation_horizon, :].flatten(0, 2).swapaxes(1, 2)
+        all_state_transitions = self.state_transitions_data[:, :, :, :self.history_horizon, :].flatten(0, 2).swapaxes(1, 2) # (num_motions * num_trajs * num_groups, obs_dim, history_horizon)
         with torch.no_grad():
             self.fld.eval()
             _, _, _, all_params = self.fld(all_state_transitions)
-        all_frequency = all_params[1]
-        all_amplitude = all_params[2]
-        all_offset = all_params[3]
+        all_frequency = all_params[1] # (num_motions * num_trajs * num_groups, latent_dim)
+        all_amplitude = all_params[2] # (num_motions * num_trajs * num_groups, latent_dim)
+        all_offset = all_params[3] # (num_motions * num_trajs * num_groups, latent_dim)
         print("[FLD] GMM fitting started.")
         self.gmm.fit(torch.cat((all_frequency, all_amplitude, all_offset), dim=1))
         print("[FLD] GMM fitting finished.")

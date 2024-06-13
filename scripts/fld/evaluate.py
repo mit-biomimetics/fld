@@ -13,10 +13,10 @@ import matplotlib.pyplot as plt
 
 class FLDEvaluate:
     
-    def __init__(self, state_idx_dict, observation_horizon, num_consecutives, device):
+    def __init__(self, state_idx_dict, history_horizon, forecast_horizon, device):
         self.state_idx_dict = state_idx_dict
-        self.observation_horizon = observation_horizon
-        self.num_consecutives = num_consecutives
+        self.history_horizon = history_horizon
+        self.forecast_horizon = forecast_horizon
         self.dim_of_interest = torch.cat(
             [
                 torch.tensor(ids, device=device, dtype=torch.long, requires_grad=False)
@@ -29,7 +29,7 @@ class FLDEvaluate:
         self.dt = 0.02
         self.observation_start_dim = 7
 
-        self.fld = FLD(self.observation_dim, observation_horizon, latent_dim, device, encoder_shape=[64, 64], decoder_shape=[64, 64])
+        self.fld = FLD(self.observation_dim, history_horizon, latent_dim, device, encoder_shape=[64, 64], decoder_shape=[64, 64])
         runs = os.listdir(log_dir_root)
         runs.sort()
         last_run = os.path.join(log_dir_root, runs[-1])
@@ -57,7 +57,7 @@ class FLDEvaluate:
 
         for i, motion_name in enumerate(motion_name_set):
             motion_path = os.path.join(datasets_root, "motion_data_" + motion_name + ".pt")
-            motion_data = torch.load(motion_path, map_location=self.device)[:, :, self.dim_of_interest]
+            motion_data = torch.load(motion_path, map_location=self.device)[:, :, self.dim_of_interest] # (num_trajs, traj_len, obs_dim)
             loaded_num_trajs, loaded_num_steps, loaded_obs_dim = motion_data.size()
             print(f"[Motion Loader] Loaded motion {motion_name} with {loaded_num_trajs} trajectories, {loaded_num_steps} steps with {loaded_obs_dim} dimensions.")
             motion_data_collection.append(motion_data.unsqueeze(0))
@@ -66,9 +66,11 @@ class FLDEvaluate:
             error = self.fld.get_dynamics_error(state_transitions, k=4).mean().item()
             print(f"[Motion Loader] Motion {motion_name} dynamics error: {error}")
 
-        motion_data_collection = torch.cat(motion_data_collection, dim=0)
-        motion_data_collection = motion_data_collection.unfold(2, self.observation_horizon + self.num_consecutives - 1, 1).swapaxes(-2, -1)
-        self.state_transitions_data = (motion_data_collection - self.state_transitions_mean) / self.state_transitions_std
+        motion_data_collection = torch.cat(motion_data_collection, dim=0) # (num_motions, num_trajs, traj_len, obs_dim)
+        # num_steps denotes the trajectory length induced by bootstrapping the window of history_horizon forward with forecast_horizon steps
+        # num_groups denotes the number of such num_steps
+        motion_data_collection = motion_data_collection.unfold(2, self.history_horizon + self.forecast_horizon - 1, 1).swapaxes(-2, -1) # (num_motions, num_trajs, num_groups, num_steps, obs_dim)
+        self.state_transitions_data = (motion_data_collection - self.state_transitions_mean) / self.state_transitions_std # (num_motions, num_trajs, num_groups, num_steps, obs_dim)
 
     def evaluate(self):
         self.fld.eval()
@@ -84,9 +86,11 @@ class FLDEvaluate:
 
         with torch.no_grad():
             for i in range(self.num_motions):
-                eval_traj = self.state_transitions_data[i, 0, :, :self.observation_horizon, :].swapaxes(1, 2)
+                eval_traj = self.state_transitions_data[i, 0, :, :self.history_horizon, :].swapaxes(1, 2) # (num_groups, obs_dim, history_horizon)
                 pred_dynamics, latent, signal, params = self.fld(eval_traj)
-                pred = pred_dynamics[0]
+                # pred_dynamics: (1, num_groups, obs_dim, history_horizon)
+                # params: 4-tuple of (phase, frequency, amplitude, offset) each of shape (num_groups, latent_dim)
+                pred = pred_dynamics[0] # (num_groups, obs_dim, history_horizon)
 
                 phase = params[0]
                 amplitude = params[2]
@@ -100,12 +104,12 @@ class FLDEvaluate:
             
             # fit GMM
             print(f"[FLD Evaluate] Fitting GMM...")
-            all_state_transitions = self.state_transitions_data[:, :, :, :self.observation_horizon, :].flatten(0, 2).swapaxes(1, 2)
+            all_state_transitions = self.state_transitions_data[:, :, :, :self.history_horizon, :].flatten(0, 2).swapaxes(1, 2) # (num_motions * num_trajs * num_groups, obs_dim, history_horizon)
             _, _, _, all_params = self.fld(all_state_transitions)
-            all_frequency = all_params[1]
-            all_amplitude = all_params[2]
-            all_offset = all_params[3]
-            latent_params = torch.cat((all_frequency, all_amplitude, all_offset), dim=1)
+            all_frequency = all_params[1] # (num_motions * num_trajs * num_groups, latent_dim)
+            all_amplitude = all_params[2] # (num_motions * num_trajs * num_groups, latent_dim)
+            all_offset = all_params[3] # (num_motions * num_trajs * num_groups, latent_dim)
+            latent_params = torch.cat((all_frequency, all_amplitude, all_offset), dim=1) # (num_motions * num_trajs * num_groups, latent_dim * 3)
             gmm.fit(latent_params)
             mu, var = gmm.get_block_parameters(latent_dim)
             self.plotter.plot_gmm(self.ax4[0], all_frequency.view(self.num_motions, -1, latent_dim), mu[0], var[0], title="Frequency GMM")
@@ -115,7 +119,7 @@ class FLDEvaluate:
             torch.save(
                 latent_params,
                 self.load_run + f"/latent_params.pt"
-                )
+                ) # (num_motions * num_trajs * num_groups, latent_dim * 3)
             torch.save(
                 {
                     "gmm_state_dict": gmm.state_dict(),
@@ -125,14 +129,18 @@ class FLDEvaluate:
 
     def sample_latent(self):
         with torch.no_grad():
-            eval_traj = self.state_transitions_data[0, 0, :, :self.observation_horizon, :].swapaxes(1, 2)
+            eval_traj = self.state_transitions_data[0, 0, :, :self.history_horizon, :].swapaxes(1, 2) # (num_groups, obs_dim, history_horizon)
             pred_dynamics, latent, signal, params = self.fld(eval_traj)
-            latent_sample_frequency = params[1][0, :] * torch.ones_like(params[1], device=device, dtype=torch.float, requires_grad=False)
-            latent_sample_amplitude = params[2][0, :] * torch.ones_like(params[2], device=device, dtype=torch.float, requires_grad=False)
-            latent_sample_offset = params[3][0, :] * torch.ones_like(params[3], device=device, dtype=torch.float, requires_grad=False)
-            latent_sample_phase = params[0][0, :] + latent_sample_frequency * torch.arange(eval_traj.size(0), device=device, dtype=torch.float, requires_grad=False).unsqueeze(-1) * self.dt
+            # params: 4-tuple of (phase, frequency, amplitude, offset) each of shape (num_groups, latent_dim)
+            
+            # Assume quasi-constant latent parameters
+            latent_sample_frequency = params[1][0, :] * torch.ones_like(params[1], device=device, dtype=torch.float, requires_grad=False) # (num_groups, latent_dim)
+            latent_sample_amplitude = params[2][0, :] * torch.ones_like(params[2], device=device, dtype=torch.float, requires_grad=False) # (num_groups, latent_dim)
+            latent_sample_offset = params[3][0, :] * torch.ones_like(params[3], device=device, dtype=torch.float, requires_grad=False) # (num_groups, latent_dim)
+            # Latent dynamics phase advancement
+            latent_sample_phase = params[0][0, :] + latent_sample_frequency * torch.arange(eval_traj.size(0), device=device, dtype=torch.float, requires_grad=False).unsqueeze(-1) * self.dt # (num_groups, latent_dim)
 
-            latent_sample_z = latent_sample_amplitude.unsqueeze(-1) * torch.sin(2 * torch.pi * (latent_sample_frequency.unsqueeze(-1) * self.fld.args + latent_sample_phase.unsqueeze(-1))) + latent_sample_offset.unsqueeze(-1)
+            latent_sample_z = latent_sample_amplitude.unsqueeze(-1) * torch.sin(2 * torch.pi * (latent_sample_frequency.unsqueeze(-1) * self.fld.args + latent_sample_phase.unsqueeze(-1))) + latent_sample_offset.unsqueeze(-1) # (num_groups, latent_dim, history_horizon)
             latent_sample_manifold = torch.hstack(
                 (
                     latent_sample_amplitude * torch.sin(2.0 * torch.pi * latent_sample_phase),
@@ -142,22 +150,22 @@ class FLDEvaluate:
             
             self.eval_manifold_collection.append(latent_sample_manifold.cpu())
 
-            decoded_traj_pred = self.fld.decoder(latent_sample_z)
-            decoded_traj_raw = decoded_traj_pred.swapaxes(1, 2)
-            decoded_traj = decoded_traj_raw * self.state_transitions_std + self.state_transitions_mean
+            decoded_traj_pred = self.fld.decoder(latent_sample_z) # (num_groups, obs_dim, history_horizon)
+            decoded_traj_raw = decoded_traj_pred.swapaxes(1, 2) # (num_groups, history_horizon, obs_dim)
+            decoded_traj = decoded_traj_raw * self.state_transitions_std + self.state_transitions_mean # (num_groups, history_horizon, obs_dim)
             decoded_traj = torch.cat(
                 (
                     decoded_traj[0, :, :],
                     decoded_traj[1:, -1, :],
                 ),
                 dim=0
-            ).unsqueeze(0)
+            ).unsqueeze(0) # (1, traj_len, obs_dim)
 
             plot_traj_index = 0
             self.plotter.plot_circles(self.ax1[0], latent_sample_phase[plot_traj_index], latent_sample_amplitude[plot_traj_index], title="Learned Phase Timing"  + " " + str(latent_dim) + "x" + str(2), show_axes=False)
-            self.plotter.plot_curves(self.ax1[1], latent_sample_z[plot_traj_index], -1.0, 1.0, -2.0, 2.0, title="Latent Parametrized Signal" + " " + str(latent_dim) + "x" + str(observation_horizon), show_axes=False)
-            self.plotter.plot_curves(self.ax1[2], decoded_traj_pred[plot_traj_index], -1.0, 1.0, -5.0, 5.0, title="Curve Reconstruction" + " " + str(self.observation_dim) + "x" + str(observation_horizon), show_axes=False)
-            self.plotter.plot_curves(self.ax1[3], decoded_traj_pred[plot_traj_index].flatten(0, 1).unsqueeze(0), -1.0, 1.0, -5.0, 5.0, title="Curve Reconstruction (Flattened)" + " " + str(1) + "x" + str(self.fld.input_channel*observation_horizon), show_axes=False)
+            self.plotter.plot_curves(self.ax1[1], latent_sample_z[plot_traj_index], -1.0, 1.0, -2.0, 2.0, title="Latent Parametrized Signal" + " " + str(latent_dim) + "x" + str(history_horizon), show_axes=False)
+            self.plotter.plot_curves(self.ax1[2], decoded_traj_pred[plot_traj_index], -1.0, 1.0, -5.0, 5.0, title="Curve Reconstruction" + " " + str(self.observation_dim) + "x" + str(history_horizon), show_axes=False)
+            self.plotter.plot_curves(self.ax1[3], decoded_traj_pred[plot_traj_index].flatten(0, 1).unsqueeze(0), -1.0, 1.0, -5.0, 5.0, title="Curve Reconstruction (Flattened)" + " " + str(1) + "x" + str(self.fld.input_channel*history_horizon), show_axes=False)
 
             for j in range(latent_dim):
                 phase = latent_sample_phase[:, j]
@@ -215,12 +223,12 @@ if __name__ == "__main__":
         "dof_pos_leg_r": [25, 26, 27, 28, 29],
         "dof_pos_arm_r": [30, 31, 32, 33],
     }
-    observation_horizon = 51
+    history_horizon = 51
     latent_dim = 8
-    num_consecutives = 50
+    forecast_horizon = 50
     device = "cuda"
     log_dir_root = LEGGED_GYM_ROOT_DIR + "/logs/flat_mit_humanoid/fld/"
-    fld_evaluate = FLDEvaluate(state_idx_dict, observation_horizon, num_consecutives, device)
+    fld_evaluate = FLDEvaluate(state_idx_dict, history_horizon, forecast_horizon, device)
     fld_evaluate.prepare_data()
     fld_evaluate.evaluate()
     plt.show()

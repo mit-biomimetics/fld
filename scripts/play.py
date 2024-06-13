@@ -91,8 +91,8 @@ def play(args: argparse.Namespace):
         actions = policy(obs.detach())
         obs, _, rews, dones, infos = env.step(actions.detach())
 
-        user_input = motion_data_collection[motion_idx, traj_idx, t:t+env.fld_observation_horizon, :]
-        if t + env.fld_observation_horizon >= motion_data_num_steps:
+        user_input = motion_data_collection[motion_idx, traj_idx, t:t+env.fld_history_horizon, :]
+        if t + env.fld_history_horizon >= motion_data_num_steps:
             motion_idx = torch.randint(0, motion_data_num_motions, (1,)).item()
             traj_idx = torch.randint(0, motion_data_num_trajs, (1,)).item()
             print(f"[Motion] Motion name {motion_name_set[motion_idx]}")

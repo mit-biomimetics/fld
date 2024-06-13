@@ -6,20 +6,20 @@ import torch
 
 class FLDExperiment:
     """
-    Represents an experiment for FLD (Future Learning from Demonstrations).
+    Represents an experiment for FLD (Fourier Latent Dynamics).
 
     Args:
         state_idx_dict (dict): A dictionary mapping state names to their corresponding indices.
-        observation_horizon (int): The length of the input observation window.
-        num_consecutives (int): The number of consecutive future steps to predict while maintaining the quasi-constant latent parameterization.
+        history_horizon (int): The length of the input observation window.
+        forecast_horizon (int): The number of consecutive future steps to predict while maintaining the quasi-constant latent parameterization.
         device (str): The device to use for computation.
 
     """
 
-    def __init__(self, state_idx_dict, observation_horizon, num_consecutives, device):
+    def __init__(self, state_idx_dict, history_horizon, forecast_horizon, device):
         self.state_idx_dict = state_idx_dict
-        self.observation_horizon = observation_horizon
-        self.num_consecutives = num_consecutives
+        self.history_horizon = history_horizon
+        self.forecast_horizon = forecast_horizon
         self.dim_of_interest = torch.cat(
             [
                 torch.tensor(ids, device=device, dtype=torch.long, requires_grad=False)
@@ -44,7 +44,7 @@ class FLDExperiment:
 
         for i, motion_name in enumerate(motion_name_set):
             motion_path = os.path.join(datasets_root, "motion_data_" + motion_name + ".pt")
-            motion_data = torch.load(motion_path, map_location=self.device)[:, :, self.dim_of_interest]
+            motion_data = torch.load(motion_path, map_location=self.device)[:, :, self.dim_of_interest] # (num_trajs, traj_len, obs_dim)
             loaded_num_trajs, loaded_num_steps, loaded_obs_dim = motion_data.size()
             print(f"[Motion Loader] Loaded motion {motion_name} with {loaded_num_trajs} trajectories, {loaded_num_steps} steps with {loaded_obs_dim} dimensions.")
             motion_data_collection.append(motion_data.unsqueeze(0))
@@ -54,9 +54,10 @@ class FLDExperiment:
         self.state_transitions_std = motion_data_collection.flatten(0, 2).std(dim=0) + 1e-6
 
         # Unfold the data to prepare for training
-        # num_steps denotes the bootstrap window size containing the observation horizon and the number of consecutive steps to predict
-        motion_data_collection = motion_data_collection.unfold(2, self.observation_horizon + self.num_consecutives - 1, 1).swapaxes(-2, -1) # (num_motions, num_trajs, num_groups, num_steps, obs_dim)
-        self.state_transitions_data = (motion_data_collection - self.state_transitions_mean) / self.state_transitions_std
+        # num_steps denotes the trajectory length induced by bootstrapping the window of history_horizon forward with forecast_horizon steps
+        # num_groups denotes the number of such num_steps
+        motion_data_collection = motion_data_collection.unfold(2, self.history_horizon + self.forecast_horizon - 1, 1).swapaxes(-2, -1) # (num_motions, num_trajs, num_groups, num_steps, obs_dim)
+        self.state_transitions_data = (motion_data_collection - self.state_transitions_mean) / self.state_transitions_std # (num_motions, num_trajs, num_groups, num_steps, obs_dim)
 
     def train(self, log_dir, latent_dim):
         """
@@ -70,8 +71,8 @@ class FLDExperiment:
         fld_training = FLDTraining(
             log_dir,
             latent_dim,
-            self.observation_horizon,
-            self.num_consecutives,
+            self.history_horizon,
+            self.forecast_horizon,
             self.state_idx_dict,
             self.state_transitions_data,
             self.state_transitions_mean,
@@ -101,13 +102,13 @@ if __name__ == "__main__":
         "dof_pos_leg_r": [25, 26, 27, 28, 29],
         "dof_pos_arm_r": [30, 31, 32, 33],
     }
-    observation_horizon = 51
+    history_horizon = 51 # the window size of the input state transitions
     latent_dim = 8
-    num_consecutives = 50
+    forecast_horizon = 50 # the autoregressive prediction steps while obeying the quasi-constant latent parameterization
     device = "cuda"
     log_dir_root = LEGGED_GYM_ROOT_DIR + "/logs/flat_mit_humanoid/fld/"
     log_dir = log_dir_root + "misc"
-    fld_experiment = FLDExperiment(state_idx_dict, observation_horizon, num_consecutives, device)
+    fld_experiment = FLDExperiment(state_idx_dict, history_horizon, forecast_horizon, device)
     fld_experiment.prepare_data()
     fld_experiment.train(log_dir, latent_dim)
     

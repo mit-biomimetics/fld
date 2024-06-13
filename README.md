@@ -56,8 +56,8 @@ This repository provides the [Fourier Latent Dynamics (FLD)](https://arxiv.org/a
 python scripts/fld/experiment.py
 ```
 
-- `observation_horizon` denotes the window size of the input data. A good practice is to set it such that it contains at least one period of the motion.
-- `num_consecutives` denotes the number of future steps to predict while maintaining the quasi-constant latent parameterization. For motions with high aperiodicity, this value should be set small. It falls back to PAE when `num_consecutives` is set to zero.
+- `history_horizon` denotes the window size of the input data. A good practice is to set it such that it contains at least one period of the motion.
+- `forecast_horizon` denotes the number of future steps to predict while maintaining the quasi-constant latent parameterization. For motions with high aperiodicity, this value should be set small. It falls back to PAE when `forecast_horizon` is set to 1.
 - The training process is visualized by inspecting the Tensorboard logs at `logs/<experiment_name>/fld/misc/`. The figures include the FLD loss, the reconstruction of sampled trajectories for each motion, the latent parameters in each latent channel along sampled trajectories for each motion with the formed latent manifold, and the latent parameter distribution.
 - The trained FLD model is saved in `logs/<experiment_name>/fld/misc/model_<iteration>.pt`, where `<experiment_name>` is defined in the experiment config.
 - The training process is logged in the same folder. Run `tensorboard --logdir logs/<experiment_name>/fld/misc/ --samples_per_plugin images=100` to visualize the training loss and plots.

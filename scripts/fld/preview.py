@@ -68,7 +68,7 @@ def preview(args: argparse.Namespace):
         motion_loader = MotionLoader(
         device=env.device,
         motion_file=motion_file,
-        reference_observation_horizon=env.fld_observation_horizon,
+        reference_history_horizon=env.fld_history_horizon,
         )
     else:
         state_idx_dict = {
@@ -85,11 +85,11 @@ def preview(args: argparse.Namespace):
 
         dim_of_interest = torch.cat([torch.tensor(ids, device=env.device, dtype=torch.long, requires_grad=False) for state, ids in state_idx_dict.items() if ((state != "base_pos") and (state != "base_quat"))])
         observation_dim = dim_of_interest.size(0)
-        observation_horizon = 51
+        history_horizon = 51
         log_dir_root = LEGGED_GYM_ROOT_DIR + "/logs/flat_mit_humanoid/fld/"
         latent_dim = 8
 
-        fld = FLD(observation_dim, observation_horizon, latent_dim, env.device, encoder_shape=env_cfg.fld.encoder_shape, decoder_shape=env_cfg.fld.decoder_shape)
+        fld = FLD(observation_dim, history_horizon, latent_dim, env.device, encoder_shape=env_cfg.fld.encoder_shape, decoder_shape=env_cfg.fld.decoder_shape)
 
         runs = os.listdir(log_dir_root)
         runs.sort()
@@ -118,15 +118,15 @@ def preview(args: argparse.Namespace):
             loaded_num_trajs, loaded_num_steps, loaded_obs_dim = motion_data.size()
             print(f"[Motion Loader] Loaded motion {motion_name} with {loaded_num_trajs} trajectories, {loaded_num_steps} steps with {loaded_obs_dim} dimensions.")
             aggregated_data = torch.zeros(loaded_num_trajs,
-                                        loaded_num_steps - observation_horizon + 1,
-                                        observation_horizon,
+                                        loaded_num_steps - history_horizon + 1,
+                                        history_horizon,
                                         loaded_obs_dim,
                                         dtype=torch.float,
                                         device=env.device,
                                         requires_grad=False
                                         )
-            for step in range(loaded_num_steps - observation_horizon + 1):
-                aggregated_data[:, step] = motion_data[:, step:step+observation_horizon, :]
+            for step in range(loaded_num_steps - history_horizon + 1):
+                aggregated_data[:, step] = motion_data[:, step:step+history_horizon, :]
             aggregated_data_collection.append(aggregated_data.unsqueeze(0))
 
         aggregated_data_collection = torch.cat(aggregated_data_collection, dim=0)
@@ -210,9 +210,9 @@ def preview(args: argparse.Namespace):
 
             if PLOT:
                 plotter.plot_circles(ax1[0], env.latent_sample_phase, env.latent_sample_amplitude, title="Learned Phase Timing"  + " " + str(latent_dim) + "x" + str(2), show_axes=False)
-                plotter.plot_curves(ax1[1], latent_sample_z, -1.0, 1.0, -2.0, 2.0, title="Latent Parametrized Signal" + " " + str(latent_dim) + "x" + str(observation_horizon), show_axes=False)
-                plotter.plot_curves(ax1[2], decoded_traj_pred.squeeze(0), -1.0, 1.0, -5.0, 5.0, title="Curve Reconstruction" + " " + str(fld.input_channel) + "x" + str(observation_horizon), show_axes=False)
-                plotter.plot_curves(ax1[3], decoded_traj_pred.flatten(1, 2), -1.0, 1.0, -5.0, 5.0, title="Curve Reconstruction (Flattened)" + " " + str(1) + "x" + str(fld.input_channel*observation_horizon), show_axes=False)
+                plotter.plot_curves(ax1[1], latent_sample_z, -1.0, 1.0, -2.0, 2.0, title="Latent Parametrized Signal" + " " + str(latent_dim) + "x" + str(history_horizon), show_axes=False)
+                plotter.plot_curves(ax1[2], decoded_traj_pred.squeeze(0), -1.0, 1.0, -5.0, 5.0, title="Curve Reconstruction" + " " + str(fld.input_channel) + "x" + str(history_horizon), show_axes=False)
+                plotter.plot_curves(ax1[3], decoded_traj_pred.flatten(1, 2), -1.0, 1.0, -5.0, 5.0, title="Curve Reconstruction (Flattened)" + " " + str(1) + "x" + str(fld.input_channel*history_horizon), show_axes=False)
                 fig1.canvas.draw()
                 fig1.canvas.flush_events()
 

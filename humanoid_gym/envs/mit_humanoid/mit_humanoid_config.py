@@ -120,7 +120,7 @@ class MITHumanoidFlatCfg(LeggedRobotCfg):
 
     class fld:
         latent_channel = 8
-        observation_horizon = 51
+        history_horizon = 51
         encoder_shape = [64, 64]
         decoder_shape = [64, 64]
         state_idx_dict = {
